@@ -18,6 +18,7 @@ class AsyncControllerSpec extends Specification {
     "create a new person" in new WithApplication {
       val resultFuture: Future[LastError] = controllers.AsyncController.createUser(User(29, "toto", Nil))
       val result: LastError = Helpers.await[LastError](resultFuture)
+      failure("toto")
       result.ok must beTrue
     }
 
