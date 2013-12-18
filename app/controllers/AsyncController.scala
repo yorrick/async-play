@@ -14,6 +14,7 @@ import play.modules.reactivemongo.json.collection.JSONCollection
 
 import models._
 import models.JsonFormats._
+import reactivemongo.core.commands.LastError
 
 
 object AsyncController extends Controller with MongoController {
@@ -84,10 +85,13 @@ object AsyncController extends Controller with MongoController {
 
   def create(name: String, age: Int) = Action.async {
     val user = User(name=name, age=age, feeds=List(Feed("Slashdot news", "http://slashdot.org/slashdot.rdf")))
-    val futureResult = collection.insert(user)
-
+    val futureResult = createUser(user)
     // when the insert is performed, send a OK 200 result
-    futureResult.map(_ => Ok)
+    futureResult.map(lastError => Ok)
+  }
+
+  def createUser(user: User): Future[LastError] = {
+    collection.insert(user)
   }
 
   def find(name: String) = Action.async {
