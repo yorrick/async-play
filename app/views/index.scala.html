@@ -1,13 +1,22 @@
-@(message: String)
+@()(implicit flash: Flash)
 
-@main("Welcome to Play Framework") {
+@main(None) {
 
-    <script type='text/javascript' src='@routes.Assets.at("javascripts/index.min.js")'></script>
-    
-    <div class="well">
-        <h1>@message</h1>
-    </div>
+@flash.get("error").map { errorMessage =>
 
-    <button id="getMessageButton">Get JSON Message</button>
+<div class="alert-message error">
+    <p>
+        <strong>Oops!</strong> @errorMessage
+    </p>
+</div>
+
+}
+
+<div class="alert-message block-message info">
+    <p>
+        <strong>This is the Play Websocket sample application!</strong>
+        To start, choose a username and sign in using the top right form.
+    </p>
+</div>
 
 }

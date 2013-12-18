@@ -2,17 +2,18 @@
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
 
-GET     /                           controllers.MainController.index()
-GET     /message                    controllers.MessageController.getMessage()
 GET     /async                      controllers.AsyncController.index()
 GET     /proxy                      controllers.AsyncController.proxy()
 GET     /serial                     controllers.AsyncController.serialResponseTime()
 GET     /parallel                   controllers.AsyncController.parallelResponseTime()
-#GET     /create                     controllers.AsyncController.create()
-GET     /create/:name/$age<[0-9]+>                     controllers.AsyncController.create(name: String, age: Int)
-GET     /find/:name                controllers.AsyncController.find(name: String)
-GET     /assets/javascripts/routes  controllers.MessageController.javascriptRoutes()
+GET     /create/:name/$age<[0-9]+>  controllers.AsyncController.create(name: String, age: Int)
+GET     /find/:name                 controllers.AsyncController.find(name: String)
+GET     /                           controllers.Application.index
+GET     /room                       controllers.Application.chatRoom(username: Option[String])
+GET     /room/chat                  controllers.Application.chat(username)
+GET     /assets/javascripts/chatroom.js controllers.Application.chatRoomJs(username: String)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
 GET     /webjars/*file              controllers.WebJarAssets.at(file)
+
