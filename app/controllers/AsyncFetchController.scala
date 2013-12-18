@@ -77,6 +77,9 @@ object AsyncController extends Controller with MongoController {
   def parallelResponseTime = responseTime(parallelFuture)
 
 
+
+
+
   def collection: JSONCollection = db.collection[JSONCollection]("persons")
 
   def create(name: String, age: Int) = Action.async {
