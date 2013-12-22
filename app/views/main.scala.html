@@ -15,15 +15,15 @@
 <div class="topbar">
     <div class="fill">
         <div class="container">
-            <a class="brand" href="@routes.Application.index()">Websocket Chat-Room</a>
+            <a class="brand" href="@routes.ChatRoomController.index()">Websocket Chat-Room</a>
 
             @connected.map { username =>
             <p class="pull-right">
                 Logged in as @username —
-                <a href="@routes.Application.index()">Disconnect</a>
+                <a href="@routes.ChatRoomController.index()">Disconnect</a>
             </p>
             }.getOrElse {
-            <form action="@routes.Application.chatRoom(None)" class="pull-right">
+            <form action="@routes.ChatRoomController.chatRoom(None)" class="pull-right">
                 <input id="username" name="username" class="input-small" type="text" placeholder="Username">
                 <button class="btn" type="submit">Sign in</button>
             </form>

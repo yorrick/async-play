@@ -11,7 +11,9 @@ import models._
 import akka.actor._
 import scala.concurrent.duration._
 
-object Application extends Controller {
+
+object ChatRoomController extends Controller {
+  import ChatRoom._
 
   /**
    * Just display the home page.
@@ -27,7 +29,7 @@ object Application extends Controller {
     username.filterNot(_.isEmpty).map { username =>
       Ok(views.html.chatRoom(username))
     }.getOrElse {
-      Redirect(routes.Application.index).flashing(
+      Redirect(routes.ChatRoomController.index).flashing(
         "error" -> "Please choose a valid username."
       )
     }
@@ -40,10 +42,6 @@ object Application extends Controller {
   /**
    * Handles the chat websocket.
    */
-  def chat(username: String) = WebSocket.async[JsValue] { request  =>
-
-    ChatRoomManager.join(username)
-
-  }
+  def chat(username: String) = ChatRoom.wsm.websocket[Receiver, JsValue](username)
 
 }
