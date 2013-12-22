@@ -1,19 +1,21 @@
 package models
 
 import akka.actor._
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.matching.Regex
 
 import play.api._
 import play.api.libs.json._
 import play.api.libs.iteratee._
 import play.api.libs.concurrent._
+import play.api.Play.current
+import play.api.libs.concurrent.Execution.Implicits._
 
 import akka.util.Timeout
 import akka.pattern.ask
 
-import play.api.Play.current
-import play.api.libs.concurrent.Execution.Implicits._
 
 object Robot {
 
@@ -41,57 +43,65 @@ object Robot {
 
 }
 
-object ChatRoom {
+object ChatRoomManager {
 
   implicit val timeout = Timeout(1 second)
 
-  lazy val default = {
-    val roomActor = Akka.system.actorOf(Props[ChatRoom])
+  lazy val chatRoom: ActorRef = {
+    val chatRoom = Akka.system.actorOf(Props[ChatRoom])
 
     // Create a bot user (just for fun)
-    Robot(roomActor)
+    Robot(chatRoom)
 
-    roomActor
+    chatRoom
   }
 
-  def join(username:String):scala.concurrent.Future[(Iteratee[JsValue,_],Enumerator[JsValue])] = {
+  lazy val pattern = new Regex("""@(\w*) .*""", "target")
 
-    (default ? Join(username)).map {
+  /**
+   * Creates the (Iteratee, Enumerator) tuple to handle a websocket connection.
+   * @param username
+   * @return
+   */
+  def join(username:String): Future[(Iteratee[JsValue,_], Enumerator[JsValue])] =
+    // send a message to chatRoom actor, asynchronously
+    (chatRoom ? Join(username)).map {
 
+      // chat room provides us the enumarator that will send data to the browser
       case Connected(enumerator) =>
 
-        // Create an Iteratee to consume the feed
+        // Create an Iteratee to consume the feed send by browser
         val iteratee = Iteratee.foreach[JsValue] { event =>
-          default ! Talk(username, (event \ "text").as[String])
+          // sends Talk message to roomActor, synchronously (we don't need a result returned by a Future)
+          val text = (event \ "text").as[String]
+          chatRoom ! Talk(username, text)
         }.map { _ =>
-          default ! Quit(username)
+          chatRoom ! Quit(username)
         }
 
         (iteratee,enumerator)
 
       case CannotConnect(error) =>
-
-        // Connection error
-
-        // A finished Iteratee sending EOF
+        // A finished Iteratee sending EOF (does not consume anything from the browser)
         val iteratee = Done[JsValue,Unit]((),Input.EOF)
 
         // Send an error and close the socket
-        val enumerator =  Enumerator[JsValue](JsObject(Seq("error" -> JsString(error)))).andThen(Enumerator.enumInput(Input.EOF))
+        val enumerator =  Enumerator[JsValue](JsObject(Seq("error" -> JsString(error))))
+                            .andThen(Enumerator.enumInput(Input.EOF))
 
         (iteratee,enumerator)
-
     }
-
-
-  }
 
 }
 
 class ChatRoom extends Actor {
 
-  var members = Set.empty[String]
-  val (chatEnumerator, chatChannel) = Concurrent.broadcast[JsValue]
+//  var members = Set.empty[String]
+  var members = scala.collection.mutable.Map.empty[String, Option[Concurrent.Channel[JsValue]]]
+
+  // creates an enumerator that will be shared by all websockets
+//  val (chatEnumerator, chatChannel) = Concurrent.broadcast[JsValue]
+//  Concurrent.unicast[JsValue]()
 
   def receive = {
 
@@ -99,39 +109,63 @@ class ChatRoom extends Actor {
       if(members.contains(username)) {
         sender ! CannotConnect("This username is already used")
       } else {
-        members = members + username
-        sender ! Connected(chatEnumerator)
+        members = members + (username -> None)
+
+        val enumerator = Concurrent.unicast[JsValue]{ channel =>
+          members(username) = Some(channel)
+        }
+
         self ! NotifyJoin(username)
+        // send a Connected message back to the sender with a message that contains the shared Enumerator
+        // the Connected message will be wrapped in a Future
+        sender ! Connected(enumerator)
       }
     }
 
     case NotifyJoin(username) => {
-      notifyAll("join", username, "has entered the room")
+      notify("join", username, "has entered the room")
     }
 
     case Talk(username, text) => {
-      notifyAll("talk", username, text)
+      val targetUser: Option[String] = members.keys.map(memberName => s"@$memberName").filter(text.startsWith(_)).toList match {
+        case member :: Nil => Some(member.replaceFirst("@", ""))
+        case _ => None
+      }
+
+      notify("talk", username, text, targetUser)
     }
 
     case Quit(username) => {
       members = members - username
-      notifyAll("quit", username, "has left the room")
+      notify("quit", username, "has left the room")
     }
 
   }
 
-  def notifyAll(kind: String, user: String, text: String) {
+  def notify(kind: String, user: String, text: String, target: Option[String] = None) {
     val msg = JsObject(
       Seq(
         "kind" -> JsString(kind),
         "user" -> JsString(user),
         "message" -> JsString(text),
         "members" -> JsArray(
-          members.toList.map(JsString)
+          members.keys.toList.map(JsString)
         )
       )
     )
-    chatChannel.push(msg)
+
+    val filterFunction = {entry: (String, Option[Concurrent.Channel[JsValue]]) =>
+      entry match {
+        case (username, channel) =>
+          target match {
+            case None => true
+            case Some(targetUsername) => username == targetUsername
+          }
+        case _ => false
+      }
+    }
+
+    members.filter(filterFunction).values.foreach(_.foreach(_.push(msg)))
   }
 
 }
