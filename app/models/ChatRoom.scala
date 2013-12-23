@@ -35,6 +35,7 @@ class BotReceiver extends Actor {
 class BotSender extends Actor {
   def receive = {
     case s =>
+      // no need to send any message to browser since it's a robot!
       play.Logger.info(s"Bot should have sent ${s}")
 
   }
