@@ -166,23 +166,18 @@ class Room(supervisorProps: Props)(implicit app: Application) {
                   (implicit msgFormatter: AdminMsgFormatter[Payload]): Future[Member] =
     bot(id, Props[BotReceiver[Payload]])
 
-  def bot[Payload](
-                    id: String,
-                    senderProps: Props
-                    )(implicit msgFormatter: AdminMsgFormatter[Payload]): Future[Member] = {
+
+  def bot[Payload](id: String, senderProps: Props)
+                  (implicit msgFormatter: AdminMsgFormatter[Payload]): Future[Member] = {
     val receiverProps = Props(classOf[BotReceiver[Payload]], msgFormatter)
-    bot(id, receiverProps, senderProps)
+    bot(id, senderProps, receiverProps)
   }
 
-  def bot[Payload](
-                    id: String,
-                    receiverProps: Props,
-                    senderProps: Props
-                    ): Future[Member] = {
+  def bot[Payload](id: String, senderProps: Props, receiverProps: Props): Future[Member] = {
 
     implicit val timeout = Timeout(1 second)
 
-    (supervisor ? ConnectBot(id, receiverProps, senderProps)).map {
+    (supervisor ? ConnectBot(id, senderProps, receiverProps)).map {
 
       case ConnectedBot(_, member) => member
 
@@ -305,7 +300,7 @@ class Supervisor extends Actor {
         c pipeTo sender
       }
 
-    case ConnectBot(id, receiverProps, senderProps) =>
+    case ConnectBot(id, senderProps, receiverProps) =>
       if(members.contains(id)) sender ! Forbidden(id, "id already connected")
       else {
         val receiveActor = context.actorOf(receiverProps, id+"-receiver")

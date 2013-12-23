@@ -20,10 +20,23 @@ class Receiver extends Actor {
   def receive = {
     case Received(from, js: JsValue) =>
       val msg = (js \ "text").as[String]
-      context.parent ! Broadcast(
-        from,
-        ChatRoom.buildMsg("talk", from, msg)
-      )
+      context.parent ! Broadcast(from, ChatRoom.buildMsg("talk", from, msg))
+  }
+}
+
+class BotReceiver extends Actor {
+  def receive = {
+    case Received(from, js: JsValue) =>
+      play.Logger.info(s"Bot ${from} broadcasting ${js}")
+      context.parent ! Broadcast(from, js)
+  }
+}
+
+class BotSender extends Actor {
+  def receive = {
+    case s =>
+      play.Logger.info(s"Bot should have sent ${s}")
+
   }
 }
 
@@ -32,15 +45,16 @@ object ChatRoom {
   // initializes Room
   val wsm = Room(Props(classOf[ChatRoomSupervisor]))
 
-//  val botId = "robot"
-//  wsm.bot(botId).map {robot =>
-//    Akka.system.scheduler.schedule(
-//      30 seconds,
-//      30 seconds,
-//      robot,
-//      Received(botId, ChatRoom.buildMsg("talk", botId, "I'm still alive"))
-//    )
-//  }
+  val botId = "robot"
+
+  wsm.bot(botId, Props[BotSender], Props[BotReceiver]).map {robot =>
+    Akka.system.scheduler.schedule(
+      30 seconds,
+      30 seconds,
+      robot.receiver,
+      Received(botId, ChatRoom.buildMsg("talk", botId, "I'm still alive"))
+    )
+  }
 
   class ChatRoomSupervisor extends Supervisor {
 
